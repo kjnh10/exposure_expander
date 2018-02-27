@@ -15,7 +15,7 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
     sum(&EXPS_AMOUNT) AS EXPS_AMOUNT,
     sum(&EXPS_AMOUNT * t1.EXPS_DUR) AS EXPS_DUR_AMOUNT,
     sum(t1.EVENT_BIT) AS EVENT_COUNT,
-    sum(t1.EVENT_AMOUNT) AS EVENT_AMOUNT
+    sum(t1.EVENT_AMOUNT_IN_TERM) AS EVENT_AMOUNT
     
     /* 使いまわされそうな式をサブクエリで先に計算しておく。Userはこのサブクエリの結果に&をつけてアクセス出来るようにする */
     FROM (SELECT 
@@ -26,7 +26,7 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
             IFN("&baflag" = "BA", MDY(&c_month, 1, &c_year), (Calculated MONTHIV_DT)) AS TERM_START,
             IFN("&baflag" = "BA", (Calculated MONTHIV_DT) - 1, INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)-1) AS TERM_END,
             IFN((Calculated TERM_START) <= &EVENT_DT <= (Calculated TERM_END), 1, 0) AS EVENT_BIT,
-            IFN((Calculated TERM_START) <= &EVENT_DT <= (Calculated TERM_END), &EVENT_AMOUNT, 0) AS EVENT_AMOUNT,
+            IFN((Calculated TERM_START) <= &EVENT_DT <= (Calculated TERM_END), &EVENT_AMOUNT, 0) AS EVENT_AMOUNT_IN_TERM,
             max(0, min(&EXPS_END_DT, (Calculated TERM_END)) - max(&EXPS_START_DT, (Calculated TERM_START)) + 1)/365.25 AS EXPS_DUR,
             (year(Calculated TERM_START) - year(&POL_START_DT))*12 + (month(Calculated TERM_START) - month(&POL_START_DT)) + ifn((Calculated BAFLAG)='AA',1,0) as PM,
             mod((Calculated PM) - 1, 12) + 1 as INNER_PM,
@@ -40,7 +40,7 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
                 (&EVENT_DT is not missing))
     as t1
 
-    where (EXPS_DUR * &EXPS_AMOUNT > 0) or (EVENT_AMOUNT > 0)
+    where (EXPS_DUR * &EXPS_AMOUNT > 0) or (EVENT_AMOUNT_IN_TERM > 0)
     GROUP BY  &properties
               %if not %sysevalf(%superq(computed_fields_used_by_grouping)=,boolean) %then , ; &computed_fields_used_by_grouping
 %mend Calc_Exposure;
