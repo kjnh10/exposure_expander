@@ -56,8 +56,9 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
 %let PM = t1.PM;
 %let INNER_PM = t1.INNER_PM;
 %let PY = t1.PY;
+%let PY_START_DT = t1.PY_START_DT;
+%let PY_END_DT = t1.PY_END_DT;
 %let FULLY_OBSERVED_PY = t1.FULLY_OBSERVED_PY;
-
 %macro monthly_loop(start_month, stop_month);
   %local yyyymm;
   %do yyyymm=&start_month %to &stop_month;
