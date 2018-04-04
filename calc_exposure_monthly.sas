@@ -31,9 +31,8 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
             (year(Calculated TERM_START) - year(&POL_START_DT))*12 + (month(Calculated TERM_START) - month(&POL_START_DT)) + ifn((Calculated BAFLAG)='AA',1,0) as PM,
             mod((Calculated PM) - 1, 12) + 1 as INNER_PM,
             ceil((Calculated PM) / 12) as PY,
-            COALESCE(MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT), YEAR(&POL_START_DT)+(Calculated PY)-1), MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT)-1, YEAR(&POL_START_DT)+(Calculated PY)-1)) AS PY_START_DT,
-            COALESCE(MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT), YEAR(&POL_START_DT)+(Calculated PY))-1, MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT)-1, YEAR(&POL_START_DT)+(Calculated PY))-1) AS PY_END_DT,
-            IFN((&OBS_START_DT <= (Calculated PY_START_DT) and (Calculated PY_END_DT) <= &OBS_END_DT), 1, 0) AS FULLY_OBSERVED_PY
+            COALESCE(MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT), YEAR(&POL_START_DT)+(Calculated PY)-1), MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT)-1, YEAR(&POL_START_DT)+(Calculated PY)-1)) FORMAT=IS8601DA10. AS PY_START_DT,
+            COALESCE(MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT), YEAR(&POL_START_DT)+(Calculated PY))-1, MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT)-1, YEAR(&POL_START_DT)+(Calculated PY))-1) FORMAT=IS8601DA10. AS PY_END_DT
           FROM &input as t1
           WHERE ((&EXPS_START_DT <= INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)) AND (MDY(&c_month, 1, &c_year) <= &EXPS_END_DT))
                        or
@@ -58,7 +57,6 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
 %let PY = t1.PY;
 %let PY_START_DT = t1.PY_START_DT;
 %let PY_END_DT = t1.PY_END_DT;
-%let FULLY_OBSERVED_PY = t1.FULLY_OBSERVED_PY;
 %macro monthly_loop(start_month, stop_month);
   %local yyyymm;
   %do yyyymm=&start_month %to &stop_month;
