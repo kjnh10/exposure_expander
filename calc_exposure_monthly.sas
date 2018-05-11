@@ -3,7 +3,7 @@ libname sasfunc "/mul/warehouse/jpnops/Experience_Analysis/library/2017/function
 options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
 
 /* c_year, c_month, baflagに対してExposureを計算してsummaryを行うマクロ */
-%macro Calc_Exposure(c_year, c_month, baflag, OBS_START_DT=0);
+%macro Calc_Exposure(c_year, c_month, baflag);
    SELECT
     /* 分析属性 */
     &properties,
@@ -36,8 +36,7 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
             ceil((Calculated PM) / 12) as PY,
             COALESCE(MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT), YEAR(&POL_START_DT)+(Calculated PY)-1), MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT)-1, YEAR(&POL_START_DT)+(Calculated PY)-1)) FORMAT=IS8601DA10. AS PY_START_DT,
             COALESCE(MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT), YEAR(&POL_START_DT)+(Calculated PY))-1, MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT)-1, YEAR(&POL_START_DT)+(Calculated PY))-1) FORMAT=IS8601DA10. AS PY_END_DT
-            %if &OBS_START_DT %then
-              ,IFN((&OBS_START_DT <= (Calculated PY_START_DT) and (Calculated PY_END_DT) <= &OBS_END_DT), 1, 0) AS FULLY_OBSERVED_PY;
+            IFN((&OBS_START_DT <= (Calculated PY_START_DT) and (Calculated PY_END_DT) <= &OBS_END_DT), 1, 0) AS FULLY_OBSERVED_PY;
           FROM &input as t1
           WHERE ((&EXPS_START_DT <= INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)) AND (MDY(&c_month, 1, &c_year) <= &EXPS_END_DT))
                        or
@@ -81,7 +80,7 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
 %mend monthly_loop;
 
 /* main part*/
-%macro make_exposure_table(start_month, stop_month, output, OBS_START_DT=0);
+%macro make_exposure_table(start_month, stop_month, output);
   %_eg_conditional_dropds(&output,tmp);
 
   PROC SQL;
