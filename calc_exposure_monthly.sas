@@ -11,10 +11,12 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
     &computed %if not %sysevalf(%superq(computed)=,boolean) %then , ;  /* ifはカンマのため */
 
     /* 集計値 */
-    sum(IFN(&EX_FROM_COUNT, 0, 1)) AS EXPS_COUNT,
     sum(IFN(&EX_FROM_COUNT, 0, t1.EXPS_DUR)) AS EXPS_DUR,
-    sum(&EXPS_AMOUNT) AS EXPS_AMOUNT,
     sum(&EXPS_AMOUNT * t1.EXPS_DUR) AS EXPS_DUR_AMOUNT,
+    sum(IFN(&EX_FROM_COUNT, 0, IFN(t1.EXPS_DUR>0, 1, 0))) AS EXPS_COUNT,  /* 内部のifはextendedされた部分ではcountが立つのを避けるため。 */
+    sum(IFN(t1.EXPS_DUR>0, &EXPS_AMOUNT, 0)) AS EXPS_AMOUNT,
+    sum(IFN(&EX_FROM_COUNT, 0, t1.EXTENDED_DUR)) AS EXTENDED_DUR,
+    sum(&EXPS_AMOUNT * t1.EXTENDED_DUR) AS EXTENDED_DUR_AMOUNT,
     sum(t1.EVENT_BIT) AS EVENT_COUNT,
     sum(t1.EVENT_AMOUNT_IN_TERM) AS EVENT_AMOUNT
     
@@ -29,6 +31,7 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
             IFN((Calculated TERM_START) <= &EVENT_DT <= (Calculated TERM_END), 1, 0) AS EVENT_BIT,
             IFN((Calculated TERM_START) <= &EVENT_DT <= (Calculated TERM_END), &EVENT_AMOUNT, 0) AS EVENT_AMOUNT_IN_TERM,
             max(0, min(&EXPS_END_DT, (Calculated TERM_END)) - max(&EXPS_START_DT, (Calculated TERM_START)) + 1)/365.25 AS EXPS_DUR,
+            max(0, min(&EXTENDED_END_DT, (Calculated TERM_END)) - max(&EXPS_START_DT, (Calculated TERM_START)) + 1)/365.25 AS EXTENDED_DUR,
             (year(Calculated TERM_START) - year(&POL_START_DT))*12 + (month(Calculated TERM_START) - month(&POL_START_DT)) + ifn((Calculated BAFLAG)='AA',1,0) as PM,
             mod((Calculated PM) - 1, 12) + 1 as INNER_PM,
             ceil((Calculated PM) / 12) as PY,
@@ -43,6 +46,7 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
     as t1
 
     where (EXPS_DUR * &EXPS_AMOUNT > 0) or (EVENT_AMOUNT_IN_TERM > 0)
+    where (EXPS_DUR * &EXPS_AMOUNT > 0) or (EVENT_AMOUNT_IN_TERM > 0) or (EXTENDED_DUR > 0)
     GROUP BY  &properties
               %if not %sysevalf(%superq(computed_fields_used_by_grouping)=,boolean) %then , ; &computed_fields_used_by_grouping
 %mend Calc_Exposure;
