@@ -23,6 +23,7 @@ You can access to the calculated fields below which vary depending on specific t
 %let input = cache.EXP_MATERIAL;
 %let EXPS_START_DT = t1.EXPS_START_DATE;
 %let EXPS_END_DT = t1.EXPS_END_DATE;
+%let EXTENDED_END_DT = t1.EXTENDED_END_DATE;  /* 観測対象のイベントが発生しているデータの観測期間単位の後ろまで伸ばした日 */
 %let POL_START_DT = t1.HIST_FIRST_ISSUE_DATE;
 %let OBS_START_DT = MDY(1, 1, 2015);
 %let OBS_END_DT = MDY(9, 30, 2017);
