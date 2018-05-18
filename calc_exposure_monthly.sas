@@ -27,8 +27,8 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
             COALESCE(MDY(&c_month, DAY(&POL_START_DT), &c_year), INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)-1) AS MONTHIV_DT,
             IFN("&baflag" = "BA", MDY(&c_month, 1, &c_year), (Calculated MONTHIV_DT)) AS TERM_START,
             IFN("&baflag" = "BA", (Calculated MONTHIV_DT) - 1, INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)-1) AS TERM_END,
-            IFN((Calculated TERM_START) <= &EVENT_DT <= (Calculated TERM_END), 1, 0) AS EVENT_BIT,
-            IFN((Calculated TERM_START) <= &EVENT_DT <= (Calculated TERM_END), &EVENT_AMOUNT, 0) AS EVENT_AMOUNT_IN_TERM,
+            IFN((Calculated TERM_START) <= &EVENT_DT <= (Calculated TERM_END), IFN(&EVENT_AMOUNT>0, 1, 0), 0) AS EVENT_BIT,
+            IFN((Calculated TERM_START) <= &EVENT_DT <= (Calculated TERM_END), MAX(0, &EVENT_AMOUNT), 0) AS EVENT_AMOUNT_IN_TERM,
             max(0, min(&EXPS_END_DT, (Calculated TERM_END)) - max(&EXPS_START_DT, (Calculated TERM_START)) + 1)/365.25 AS EXPS_DUR,
             max(0, min(&EXTENDED_END_DT, (Calculated TERM_END)) - max(&EXPS_START_DT, (Calculated TERM_START)) + 1)/365.25 AS EXTENDED_DUR,
             (year(Calculated TERM_START) - year(&POL_START_DT))*12 + (month(Calculated TERM_START) - month(&POL_START_DT)) + ifn((Calculated BAFLAG)='AA',1,0) as PM,
@@ -43,7 +43,7 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
                 (&EVENT_DT is not missing))
     as t1
 
-    where (EXPS_DUR * &EXPS_AMOUNT > 0) or (EVENT_AMOUNT_IN_TERM > 0) or (EXTENDED_DUR > 0)
+    where (EXPS_DUR>0 and &EXPS_AMOUNT<>0) or (EVENT_AMOUNT_IN_TERM > 0) or (EXTENDED_DUR>0 and &EXPS_AMOUNT<>0)
     GROUP BY  &properties
               %if not %sysevalf(%superq(computed_fields_used_by_grouping)=,boolean) %then , ; &computed_fields_used_by_grouping
 %mend Calc_Exposure;
