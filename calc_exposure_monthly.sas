@@ -1,7 +1,3 @@
-/* SET UP FUNCTIONS LIBRARY*/
-libname sasfunc "/mul/warehouse/jpnops/Experience_Analysis/library/2017/function/ver1.2";
-options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
-
 /* c_year, c_month, baflagに対してExposureを計算してsummaryを行うマクロ */
 %macro Calc_Exposure(c_year, c_month, baflag);
    SELECT
