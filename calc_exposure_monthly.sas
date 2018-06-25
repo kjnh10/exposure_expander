@@ -26,12 +26,21 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
             &c_year AS CY,
             &c_month AS CM,
 
-            COALESCE(MDY(&c_month, DAY(&POL_START_DT), &c_year), INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)-1) AS ANNIV_DT,
-            IFN("&baflag" = "BA", MDY(&c_month, 1, &c_year), (Calculated ANNIV_DT)) AS TERM_START,
-            IFN("&baflag" = "BA", (Calculated ANNIV_DT) - 1, INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)-1) AS TERM_END,
-            (year(Calculated TERM_START) - year(&POL_START_DT))*12 + (month(Calculated TERM_START) - month(&POL_START_DT)) + ifn((Calculated BAFLAG)='AA',1,0) as PM,
-            mod((Calculated PM) - 1, 12) + 1 as INNER_PM,
-            ceil((Calculated PM) / 12) as PY,
+            %if &g_span=monthiv %then 
+              COALESCE(MDY(&c_month, DAY(&POL_START_DT), &c_year), INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)-1) AS ANNIV_DT,
+              IFN("&baflag" = "BA", MDY(&c_month, 1, &c_year), (Calculated ANNIV_DT)) AS TERM_START,
+              IFN("&baflag" = "BA", (Calculated ANNIV_DT) - 1, INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)-1) AS TERM_END,
+              (year(Calculated TERM_START) - year(&POL_START_DT))*12 + (month(Calculated TERM_START) - month(&POL_START_DT)) + ifn((Calculated BAFLAG)='AA',1,0) as PM,
+              mod((Calculated PM) - 1, 12) + 1 as INNER_PM,
+              ceil((Calculated PM) / 12) as PY,
+            ;%else 
+              COALESCE(MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT), &c_year), MDY(2, 28, &c_year)) AS ANNIV_DT,
+              IFN("&baflag" = "BA", MDY(1, 1, &c_year), (Calculated ANNIV_DT)) AS TERM_START,
+              IFN("&baflag" = "BA", (Calculated ANNIV_DT) - 1, MDY(12, 31, &c_year)) AS TERM_END,
+              -1 as PM,
+              -1 as INNER_PM,
+              (year(Calculated TERM_START) - year(&POL_START_DT)) + ifn((Calculated BAFLAG)='AA',1,0) as PY,
+            ;
 
             IFN((Calculated TERM_START) <= &EVENT_DT <= (Calculated TERM_END), IFN(&EVENT_AMOUNT>0, 1, 0), 0) AS EVENT_BIT,
             IFN((Calculated TERM_START) <= &EVENT_DT <= (Calculated TERM_END), MAX(0, &EVENT_AMOUNT), 0) AS EVENT_AMOUNT_IN_TERM,
@@ -42,9 +51,14 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
             IFN((&OBS_START_DT <= (Calculated PY_START_DT) and (Calculated PY_END_DT) <= &OBS_END_DT), 1, 0) AS FULLY_OBSERVED_PY
           FROM &input as t1
 
-          WHERE ((&EXPS_START_DT <= INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)) AND (MDY(&c_month, 1, &c_year) <= &EXPS_END_DT))
-                       or
-                (&EVENT_DT is not missing))
+          WHERE
+            (&EVENT_DT is not missing)
+            %if &g_span=monthiv %then 
+              or ((&EXPS_START_DT <= INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)) AND (MDY(&c_month, 1, &c_year) <= &EXPS_END_DT))
+            ;%else
+              or ((&EXPS_START_DT <= MDY(1, 1, &c_year+1)) AND (MDY(1, 1, &c_year) <= &EXPS_END_DT))
+            ;
+          )
     as t1
 
     where (EXPS_DUR>0 and &EXPS_AMOUNT<>0) or (EVENT_AMOUNT_IN_TERM > 0) or (EXTENDED_DUR>0 and &EXPS_AMOUNT<>0)
