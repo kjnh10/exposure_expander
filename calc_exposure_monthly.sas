@@ -80,14 +80,14 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
 %mend monthly_loop;
 
 /* main part*/
-%macro make_exposure_table(start_month, stop_month, output);
+%macro make_exposure_table(start_time, stop_time, output, span=monthiv);
   %_eg_conditional_dropds(&output,tmp);
 
   PROC SQL;
     create table tmp as %Calc_Exposure(c_year=2010, c_month=12, baflag=BA); /* templateの作成。いつ時点を使ってもよい。 */
     create table &output like tmp;
     drop table tmp;
-    %monthly_loop(start_month=&start_month, stop_month=&stop_month)
+    %monthly_loop(start_month=&start_time, stop_month=&stop_time)
   QUIT;
 %mend make_exposure_table;
 
