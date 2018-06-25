@@ -79,6 +79,15 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
   %end;
 %mend monthly_loop;
 
+%macro yearly_loop(start_year, stop_year);
+  %do year=&start_year %to &stop_year;
+    insert into &output
+    %Calc_Exposure(c_year=&year, c_month=-1, baflag=BA);
+    insert into &output
+    %Calc_Exposure(c_year=&year, c_month=-1, baflag=AA);
+  %end;
+%mend yearly_loop;
+
 /* main part*/
 %macro make_exposure_table(start_time, stop_time, output, span=monthiv);
   %_eg_conditional_dropds(&output,tmp);
