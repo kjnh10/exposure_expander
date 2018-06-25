@@ -70,6 +70,7 @@
 %let TERM_START = t1.TERM_START;
 %let TERM_END = t1.TERM_END;
 %let EXPS_DUR = t1.EXPS_DUR;
+%let CY = t1.CY;
 %let CM = t1.CM;
 %let PM = t1.PM;
 %let INNER_PM = t1.INNER_PM;
@@ -121,6 +122,6 @@
     %if &g_span=monthiv %then
       %monthly_loop(start_month=&start_time, stop_month=&stop_time);
     %else
-      %yearly_loop(start_year=&start_time, stop_year=&stop_time);
+      %yearly_loop(start_year=%substr(&start_time, 1, 4), stop_year=%substr(&stop_time, 1, 4));  /* yyyymm‚ªˆø”‚É‚È‚Á‚Ä‚¢‚½ê‡‚Íyyyy‚É•ÏŠ·‚µ‚Ä‚©‚ç“n‚·B */
   QUIT;
 %mend make_exposure_table;
