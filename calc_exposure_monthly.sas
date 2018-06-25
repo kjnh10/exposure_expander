@@ -23,7 +23,9 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
     FROM (SELECT 
             *,
             "&baflag" AS BAFLAG,
-            (&c_year * 100 + &c_month) AS CM,
+            &c_year AS CY,
+            &c_month AS CM,
+
             COALESCE(MDY(&c_month, DAY(&POL_START_DT), &c_year), INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)-1) AS MONTHIV_DT,
             IFN("&baflag" = "BA", MDY(&c_month, 1, &c_year), (Calculated MONTHIV_DT)) AS TERM_START,
             IFN("&baflag" = "BA", (Calculated MONTHIV_DT) - 1, INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)-1) AS TERM_END,
