@@ -7,7 +7,7 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
    SELECT
     /* 分析属性 */
     &properties,
-    &computed %if not %sysevalf(%superq(computed)=,boolean) %then , ;  /* ifはカンマのため */
+    &computed %if not %sysevalf(%superq(computed)=,boolean) %then , ;
 
     /* 集計値 */
     sum(IFN(&EX_FROM_COUNT, 0, t1.EXPS_DUR)) AS EXPS_DUR,
@@ -26,6 +26,7 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
             &c_year AS CY,
             &c_month AS CM,
 
+            /* monthlyかyearlyかによりロジックが変わる部分 */
             %if &g_span=monthiv %then 
               COALESCE(MDY(&c_month, DAY(&POL_START_DT), &c_year), INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)-1) AS ANNIV_DT,
               IFN("&baflag" = "BA", MDY(&c_month, 1, &c_year), (Calculated ANNIV_DT)) AS TERM_START,
@@ -41,6 +42,7 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
               -1 as INNER_PM,
               (year(Calculated TERM_START) - year(&POL_START_DT)) + ifn((Calculated BAFLAG)='AA',1,0) as PY,
             ;
+            /* */
 
             IFN((Calculated TERM_START) <= &EVENT_DT <= (Calculated TERM_END), IFN(&EVENT_AMOUNT>0, 1, 0), 0) AS EVENT_BIT,
             IFN((Calculated TERM_START) <= &EVENT_DT <= (Calculated TERM_END), MAX(0, &EVENT_AMOUNT), 0) AS EVENT_AMOUNT_IN_TERM,
@@ -65,7 +67,6 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
     GROUP BY  &properties
               %if not %sysevalf(%superq(computed_fields_used_by_grouping)=,boolean) %then , ; &computed_fields_used_by_grouping
 %mend Calc_Exposure;
-
 
 /* userからマクロ変数で呼び出せるようにailiasを貼る。 */
 %let BAFLAG = t1.BAFLAG;
@@ -92,7 +93,7 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
     insert into &output
     %Calc_Exposure(c_year=&year, c_month=&month, baflag=AA);
 
-    /* SPECIAL CASE WHEN WE REACH END OF A YEAR*/
+    /* Special case when we reach end of a year*/
     %if &month = 12 %then %let yyyymm = %eval(&yyyymm + 88);     
   %end;
 %mend monthly_loop;
@@ -114,9 +115,9 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
 
   PROC SQL;
     %if &g_span=monthiv %then
-      create table tmp as %Calc_Exposure(c_year=2010, c_month=12, baflag=BA); 
+      create table tmp as %Calc_Exposure(c_year=2010, c_month=12, baflag=BA);
     %else
-      create table tmp as %Calc_Exposure(c_year=2010, c_month=-1, baflag=BA);
+      create table tmp as %Calc_Exposure(c_year=2010, c_month=-1, baflag=BA);  /* yearlyとmonthlyで現在は同一のテーブルが生成されるはずだが念のため分けておく。*/
     ;
     create table &output like tmp;
     drop table tmp;
@@ -127,5 +128,3 @@ options cmplib = (sasfunc.misc sasfunc.IP sasfunc.time);
       %yearly_loop(start_year=&start_time, stop_year=&stop_time);
   QUIT;
 %mend make_exposure_table;
-
-
