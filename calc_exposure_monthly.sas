@@ -40,21 +40,21 @@
             ;
             /* */
 
-            IFN((Calculated TERM_START) <= &EVENT_DT <= (Calculated TERM_END), IFN(&EVENT_AMOUNT>0, 1, 0), 0) AS EVENT_BIT,
-            IFN((Calculated TERM_START) <= &EVENT_DT <= (Calculated TERM_END), MAX(0, &EVENT_AMOUNT), 0) AS EVENT_AMOUNT_IN_TERM,
-            max(0, min(&EXPS_END_DT, (Calculated TERM_END)) - max(&EXPS_START_DT, (Calculated TERM_START)) + 1)/365.25 AS EXPS_DUR,
-            max(0, min(&EXTENDED_END_DT, (Calculated TERM_END)) - max(&EXPS_START_DT, (Calculated TERM_START)) + 1)/365.25 AS EXTENDED_DUR,
+            IFN((Calculated TERM_START) <= &g_EVENT_DT <= (Calculated TERM_END), IFN(&EVENT_AMOUNT>0, 1, 0), 0) AS EVENT_BIT,
+            IFN((Calculated TERM_START) <= &g_EVENT_DT <= (Calculated TERM_END), MAX(0, &EVENT_AMOUNT), 0) AS EVENT_AMOUNT_IN_TERM,
+            max(0, min(&g_EXPS_END_DT, (Calculated TERM_END)) - max(&g_EXPS_START_DT, (Calculated TERM_START)) + 1)/365.25 AS EXPS_DUR,
+            max(0, min(&EXTENDED_END_DT, (Calculated TERM_END)) - max(&g_EXPS_START_DT, (Calculated TERM_START)) + 1)/365.25 AS EXTENDED_DUR,
             COALESCE(MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT), YEAR(&POL_START_DT)+(Calculated PY)-1), MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT)-1, YEAR(&POL_START_DT)+(Calculated PY)-1)) FORMAT=IS8601DA10. AS PY_START_DT,
             COALESCE(MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT), YEAR(&POL_START_DT)+(Calculated PY))-1, MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT)-1, YEAR(&POL_START_DT)+(Calculated PY))-1) FORMAT=IS8601DA10. AS PY_END_DT,
             IFN((&OBS_START_DT <= (Calculated PY_START_DT) and (Calculated PY_END_DT) <= &OBS_END_DT), 1, 0) AS FULLY_OBSERVED_PY
           FROM &input as t1
 
           WHERE
-            (&EVENT_DT is not missing)
+            (&g_EVENT_DT is not missing)
             %if &g_span=monthiv %then 
-              or ((&EXPS_START_DT <= INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)) AND (MDY(&c_month, 1, &c_year) <= &EXPS_END_DT))
+              or ((&g_EXPS_START_DT <= INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)) AND (MDY(&c_month, 1, &c_year) <= &g_EXPS_END_DT))
             ;%else
-              or ((&EXPS_START_DT <= MDY(1, 1, &c_year+1)) AND (MDY(1, 1, &c_year) <= &EXPS_END_DT))
+              or ((&g_EXPS_START_DT <= MDY(1, 1, &c_year+1)) AND (MDY(1, 1, &c_year) <= &g_EXPS_END_DT))
             ;
           )
     as t1
@@ -105,10 +105,19 @@
 %mend yearly_loop;
 
 /* main part*/
-%macro make_exposure_table(start_time, stop_time, output, span=monthiv);
+%macro make_exposure_table(start_month, stop_month, output, span=monthiv);
   %_eg_conditional_dropds(&output,tmp);
+
+  %let start_dt = mdy(mod(&start_month,100), 1, &start_month/100);
+  %let end_dt = intnx('MONTH', mdy(mod(&stop_month,100), 1, &stop_month/100), 1)-1;
   %global g_span;
   %let g_span=&span;
+  %global g_EXPS_START_DT;
+  %let g_EXPS_START_DT = max(&EXPS_START_DT, &start_dt);
+  %global g_EXPS_END_DT;
+  %let g_EXPS_END_DT = min(&EXPS_END_DT, &end_dt);
+  %global g_EVENT_DT;
+  %let g_EVENT_DT = ifn(&start_dt <= &EVENT_DT <= &end_dt, &EVENT_DT, .);
 
   PROC SQL;
     %if &g_span=monthiv %then
@@ -120,8 +129,8 @@
     drop table tmp;
 
     %if &g_span=monthiv %then
-      %monthly_loop(start_month=&start_time, stop_month=&stop_time);
+      %monthly_loop(start_month=&start_month, stop_month=&stop_month);
     %else
-      %yearly_loop(start_year=%substr(&start_time, 1, 4), stop_year=%substr(&stop_time, 1, 4));  /* yyyymm‚ªˆø”‚É‚È‚Á‚Ä‚¢‚½ê‡‚Íyyyy‚É•ÏŠ·‚µ‚Ä‚©‚ç“n‚·B */
+      %yearly_loop(start_year=%substr(&start_month, 1, 4), stop_year=%substr(&stop_month, 1, 4));
   QUIT;
 %mend make_exposure_table;
