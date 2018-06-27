@@ -4,9 +4,8 @@ make exposure-time series table from the latest snapshot
 
 # default calculated fields
 You can access to the calculated fields below which vary depending on specific terms.
-* &c_year
-* &c_month
 * &CM
+* &CY
 * &TERM_START
 * &TERM_END
 * &BAFLAG
@@ -18,26 +17,32 @@ You can access to the calculated fields below which vary depending on specific t
 
 # Sample Setting
 ```SQL
-%include "/mul/warehouse/jpnops/Experience_Analysis/library/2018/macros/make_exposure_table/ver0.10/calc_exposure_monthly.sas" /SOURCE2;
+/* user parameter setting
+%include "<script directory>/calc_exposure.sas" /SOURCE2;
 
-%let input = cache.EXP_MATERIAL;
-%let EXPS_START_DT = t1.EXPS_START_DATE;
-%let EXPS_END_DT = t1.EXPS_END_DATE;
-%let EXTENDED_END_DT = t1.EXTENDED_END_DATE;  /* 観測対象のイベントが発生しているデータの観測期間単位の後ろまで伸ばした日 */
-%let POL_START_DT = t1.HIST_FIRST_ISSUE_DATE;
-%let OBS_START_DT = MDY(1, 1, 2015);
-%let OBS_END_DT = MDY(9, 30, 2017);
-%let EXPS_AMOUNT = IFN(t1.DEC_FA_DATE is not missing, t1.DEC_AP, t1.ANNUAL_PREM);
-%let EX_FROM_COUNT = ifn(t1.DEC_FA_DATE is not missing, 1, 0);
-%let EVENT_DT = t1.LAPSE_DATE;
-%let EVENT_AMOUNT = &EXPS_AMOUNT;
-%let computed = (year(&TERM_START) - year(&EXPS_START_DT))*12 + (month(&TERM_START) - month(&EXPS_START_DT)) + ifn(&baflag='AA',1,0) as RPM /* record pm*/;
-%let computed_fields_used_by_grouping = RPM;
+%let input = WORK.QUERY_FOR_TIME_SERIES_SAS7B_0001;
+%let input = WORK.dev;
+%let EXPS_START_DT = t1.ORIG_ISSUE_DATE;
+%let EXPS_END_DT = t1.EXP_END_DATE;
+%let EXTENDED_END_DT = t1.EXP_END_DATE; /* 観測対象のイベントが発生しているデータの観測期間単位の後ろまで伸ばした日 */
+%let OBS_START_DT = MDY(1, 1, 2010);  /* fully observed pyの計算に使用される*/
+%let OBS_END_DT = MDY(3, 31, 2018);  /* fully observed pyの計算に使用される*/
+%let POL_START_DT = t1.ORIG_ISSUE_DATE;  /* for PY calculation */
+%let EVENT_DT = IFN(t1.DEATH_DATE is not missing, t1.DEATH_DATE, .);
+%let EVENT_AMOUNT = t1.DEATH_CLAIM_AMOUNT;
+%let EX_FROM_COUNT = ifn(t1.TYPE= "DECREASE", 1, 0);
+%let EXPS_AMOUNT = IFN(t1.TYPE= "DECREASE", t1.DEC_AMT, t1.AMT_FOR_EXPS)
+                     * IFN(t1.IP_ind = 0, 1, present_value(t1.PREM_PMT_PERIOD*12 -  passedTime("month", &POL_START_DT, &TERM_START), IFN(t1.'Main Product'n = "UL", 5, 2), 0.0185, 0.01));
+
+%let computed = IFN(0 < t1.FIRST_RENEW_DT <= t1.TERM_START and t1.YRT = 0, 1, 0) AS AFTER_RENEWAL;
+%let computed_fields_used_by_grouping = AFTER_RENEWAL;
 %let properties = /* t1.POLICY_ID, t1.COV_NO, */
-                  &CM, &BAFLAG, t1.SEX_CODE, t1.PLAN_CODE, t1.assumption_class, t1.study_class, t1.paid_up_age,
-                  t1.YRT_FLAG, t1.COV_TERM, t1.PRE_COV_TERM, t1.ISSUE_AGE , t1.PLAN_TERM, t1.IP_ind, &PM, &INNER_PM, &PY, &FULLY_OBSERVED_PY
+                  &CY, &CM, t1.BAFLAG, t1.IM, t1.'UW-typ-CD'n,
+                  t1.SEX_CODE, t1.PLAN_CODE, t1.'Main Product'n, t1.ISSUE_AGE, t1.CHANNEL_CODE, t1.PREM_PMT_PERIOD, t1.PLAN_TERM, t1.ORIG_TERM, t1.COV_TERM
+                  ,t1.MULT_RATING_FCT
                   ;
 
 /* main part*/
-  %make_exposure_table(start_month = 201501, stop_month = 201709, output=cache.EXPOSURE_MONTHLY_2015_2017)
+  %make_exposure_table(start_month = 201001, stop_month = 201709, output=WORK.EXP_MONTHLY)
+  /* %make_exposure_table(start_month = 201001, stop_month = 201709, output=WORK.EXP_YEARLY, span=yearly) */
 ```
