@@ -23,7 +23,7 @@
             &c_month AS CM,
 
             /* monthlyかyearlyかによりロジックが変わる部分 */
-            %if &g_span=monthiv %then 
+            %if &g_span=monthly %then
               COALESCE(MDY(&c_month, DAY(&POL_START_DT), &c_year), INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)-1) AS ANNIV_DT,
               IFN("&baflag" = "BA", MDY(&c_month, 1, &c_year), (Calculated ANNIV_DT)) AS TERM_START,
               IFN("&baflag" = "BA", (Calculated ANNIV_DT) - 1, INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)-1) AS TERM_END,
@@ -44,14 +44,14 @@
             IFN((Calculated TERM_START) <= &g_EVENT_DT <= (Calculated TERM_END), MAX(0, &EVENT_AMOUNT), 0) AS EVENT_AMOUNT_IN_TERM,
             max(0, min(&g_EXPS_END_DT, (Calculated TERM_END)) - max(&g_EXPS_START_DT, (Calculated TERM_START)) + 1)/365.25 AS EXPS_DUR,
             max(0, min(&EXTENDED_END_DT, (Calculated TERM_END)) - max(&g_EXPS_START_DT, (Calculated TERM_START)) + 1)/365.25 AS EXTENDED_DUR,
-            COALESCE(MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT), YEAR(&POL_START_DT)+(Calculated PY)-1), MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT)-1, YEAR(&POL_START_DT)+(Calculated PY)-1)) FORMAT=IS8601DA10. AS PY_START_DT,
-            COALESCE(MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT), YEAR(&POL_START_DT)+(Calculated PY))-1, MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT)-1, YEAR(&POL_START_DT)+(Calculated PY))-1) FORMAT=IS8601DA10. AS PY_END_DT,
+            INTNX("YEAR", &POL_START_DT, (Calculated PY)-1, "sameday") AS PY_START_DT,
+            INTNX("YEAR", &POL_START_DT, (Calculated PY), "sameday")-1 AS PY_END_DT,
             IFN((&OBS_START_DT <= (Calculated PY_START_DT) and (Calculated PY_END_DT) <= &OBS_END_DT), 1, 0) AS FULLY_OBSERVED_PY
           FROM &input as t1
 
           WHERE
             (&g_EVENT_DT is not missing)
-            %if &g_span=monthiv %then 
+            %if &g_span=monthly %then
               or ((&g_EXPS_START_DT <= INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)) AND (MDY(&c_month, 1, &c_year) <= &g_EXPS_END_DT))
             ;%else
               or ((&g_EXPS_START_DT <= MDY(1, 1, &c_year+1)) AND (MDY(1, 1, &c_year) <= &g_EXPS_END_DT))
@@ -105,7 +105,7 @@
 %mend yearly_loop;
 
 /* main part*/
-%macro make_exposure_table(start_month, stop_month, output, span=monthiv);
+%macro make_exposure_table(start_month, stop_month, output, span=monthly);
   %_eg_conditional_dropds(&output,tmp);
 
   %let start_dt = mdy(mod(&start_month,100), 1, &start_month/100);
@@ -120,7 +120,7 @@
   %let g_EVENT_DT = ifn(&start_dt <= &EVENT_DT <= &end_dt, &EVENT_DT, .);
 
   PROC SQL;
-    %if &g_span=monthiv %then
+    %if &g_span=monthly %then
       create table tmp as %Calc_Exposure(c_year=2010, c_month=12, baflag=BA);
     %else
       create table tmp as %Calc_Exposure(c_year=2010, c_month=-1, baflag=BA);  /* yearlyとmonthlyで現在は同一のテーブルが生成されるはずだが念のため分けておく。*/
@@ -128,7 +128,7 @@
     create table &output like tmp;
     drop table tmp;
 
-    %if &g_span=monthiv %then
+    %if &g_span=monthly %then
       %monthly_loop(start_month=&start_month, stop_month=&stop_month);
     %else
       %yearly_loop(start_year=%substr(&start_month, 1, 4), stop_year=%substr(&stop_month, 1, 4));
