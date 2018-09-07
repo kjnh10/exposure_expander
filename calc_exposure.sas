@@ -30,10 +30,20 @@
               (year(Calculated TERM_START) - year(&POL_START_DT))*12 + (month(Calculated TERM_START) - month(&POL_START_DT)) + ifn((Calculated BAFLAG)='AA',1,0) as PM,
               mod((Calculated PM) - 1, 12) + 1 as INNER_PM,
               ceil((Calculated PM) / 12) as PY,
-            ;%else 
+            ;
+
+            %if &g_span=yearly %then
               COALESCE(MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT), &c_year), MDY(2, 28, &c_year)) AS ANNIV_DT,
               IFN("&baflag" = "BA", MDY(1, 1, &c_year), (Calculated ANNIV_DT)) AS TERM_START,
               IFN("&baflag" = "BA", (Calculated ANNIV_DT) - 1, MDY(12, 31, &c_year)) AS TERM_END,
+              -1 as PM,
+              -1 as INNER_PM,
+              (year(Calculated TERM_START) - year(&POL_START_DT)) + ifn((Calculated BAFLAG)='AA',1,0) as PY,
+            ;
+            %if &g_span=FY_yearly %then
+              COALESCE(MDY(MONTH(&POL_START_DT), DAY(&POL_START_DT), &c_year + IFN(month(&POL_START_DT) in (1,2,3), 1, 0)), MDY(2, 28, &c_year+IFN(month(&POL_START_DT) in (1,2,3), 1, 0))) AS ANNIV_DT,
+              IFN("&baflag" = "BA", MDY(4, 1, &c_year), (Calculated ANNIV_DT)) AS TERM_START,
+              IFN("&baflag" = "BA", (Calculated ANNIV_DT) - 1, MDY(3, 31, &c_year+1)) AS TERM_END,
               -1 as PM,
               -1 as INNER_PM,
               (year(Calculated TERM_START) - year(&POL_START_DT)) + ifn((Calculated BAFLAG)='AA',1,0) as PY,

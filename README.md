@@ -3,23 +3,24 @@ exposure_expander
 make exposure-time series table from the latest snapshot
 
 # default calculated fields
-You can access to the calculated fields below which vary depending on specific terms.
-* &CM
-* &CY
-* &TERM_START
-* &TERM_END
-* &BAFLAG
-* &MONTHIV_DT
-* &EXP_DUR
-* &PM
-* &PY
-* &FULLY_OBSERVED_PY
 
 # Sample Setting
 ```SQL
 %include "<script directory>/calc_exposure.sas" /SOURCE2;
 
 /* user parameter setting */
+/* You can access to the calculated fields below which vary depending on specific terms. */
+  * &CM
+  * &CY  /* filled FY when specified span=FY_yearly */
+  * &TERM_START
+  * &TERM_END
+  * &BAFLAG
+  * &ANIV_DT
+  * &EXPS_DUR
+  * &PM
+  * &PY
+  * &FULLY_OBSERVED_PY
+
 %let input = WORK.QUERY_FOR_TIME_SERIES_SAS7B_0001;
 %let input = WORK.dev;
 %let EXPS_START_DT = t1.ORIG_ISSUE_DATE;
@@ -45,4 +46,5 @@ You can access to the calculated fields below which vary depending on specific t
 /* main part*/
   %make_exposure_table(start_month = 201001, stop_month = 201709, output=WORK.EXP_MONTHLY)
   /* %make_exposure_table(start_month = 201001, stop_month = 201709, output=WORK.EXP_YEARLY, span=yearly) */
+  /* %make_exposure_table(start_month = 201001, stop_month = 201709, output=WORK.EXP_YEARLY, span=FY_yearly) FY-based yearly loop */
 ```
