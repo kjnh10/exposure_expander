@@ -53,7 +53,7 @@
             IFN((Calculated TERM_START) <= &g_EVENT_DT <= (Calculated TERM_END), IFN(&EVENT_AMOUNT>0, 1, 0), 0) AS EVENT_BIT,
             IFN((Calculated TERM_START) <= &g_EVENT_DT <= (Calculated TERM_END), MAX(0, &EVENT_AMOUNT), 0) AS EVENT_AMOUNT_IN_TERM,
             max(0, min(&g_EXPS_END_DT, (Calculated TERM_END)) - max(&g_EXPS_START_DT, (Calculated TERM_START)) + 1)/365.25 AS EXPS_DUR,
-            max(0, min(&EXTENDED_END_DT, (Calculated TERM_END)) - max(&g_EXPS_START_DT, (Calculated TERM_START)) + 1)/365.25 AS EXTENDED_DUR,
+            max(0, min(&g_EXTENDED_END_DT, (Calculated TERM_END)) - max(&g_EXPS_START_DT, (Calculated TERM_START)) + 1)/365.25 AS EXTENDED_DUR,
             INTNX("YEAR", &POL_START_DT, (Calculated PY)-1, "sameday") AS PY_START_DT,
             INTNX("YEAR", &POL_START_DT, (Calculated PY), "sameday")-1 AS PY_END_DT,
             IFN((&OBS_START_DT <= (Calculated PY_START_DT) and (Calculated PY_END_DT) <= &OBS_END_DT), 1, 0) AS FULLY_OBSERVED_PY
@@ -122,10 +122,28 @@
   %let end_dt = intnx('MONTH', mdy(mod(&stop_month,100), 1, &stop_month/100), 1)-1;
   %global g_span;
   %let g_span=&span;
+
   %global g_EXPS_START_DT;
-  %let g_EXPS_START_DT = max(&EXPS_START_DT, &start_dt);
+  %let g_EXPS_START_DT = ifn(
+                              &EXPS_START_DT is missing,  
+                              0, /* 欠損値の場合にexps_dur, exps_dur_amountを0にするため。exps_durの計算式内にてmin, maxが使用されているがこれらが欠損値を無視するためこの対応をしておく。*/
+                              max(&EXPS_START_DT, &start_dt)  /* span = yeary を指定した場合は余計な期間が入らないように端をカットしておく */
+                            );
+
   %global g_EXPS_END_DT;
-  %let g_EXPS_END_DT = min(&EXPS_END_DT, &end_dt);
+  %let g_EXPS_END_DT = ifn(
+                            &EXPS_END_DT is missing,
+                            0,
+                            min(&EXPS_END_DT, &end_dt)
+                          );
+
+  %global g_EXTENDED_END_DT;
+  %let g_EXTENDED_END_DT = ifn(
+                            &EXTENDED_END_DT is missing,
+                            0,
+                            min(&EXTENDED_END_DT, &end_dt)
+                          );
+
   %global g_EVENT_DT;
   %let g_EVENT_DT = ifn(&start_dt <= &EVENT_DT <= &end_dt, &EVENT_DT, .);
 
