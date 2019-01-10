@@ -1,8 +1,11 @@
-/* c_year, c_month, baflagに対してExposureを計算してsummaryを行うマクロ */
 %macro Calc_Exposure(c_year, c_month, baflag);
+   /* c_year, c_month, baflagに対してExposureを計算してsummaryを行う関数 */
+
    SELECT
     /* 分析属性 */
     &properties,
+
+    /* custom field: 分析属性の追加にも集計値の追加にも利用できる */
     &computed %if not %sysevalf(%superq(computed)=,boolean) %then , ;
 
     /* 集計値 */
@@ -12,11 +15,42 @@
     sum(IFN(t1.EXPS_DUR>0, &EXPS_AMOUNT, 0)) AS EXPS_AMOUNT,
     sum(IFN(&EX_FROM_COUNT, 0, t1.EXTENDED_DUR)) AS EXTENDED_DUR,
     sum(&EXPS_AMOUNT * t1.EXTENDED_DUR) AS EXTENDED_DUR_AMOUNT,
-    sum(t1.EVENT_BIT) AS EVENT_COUNT,
-    sum(t1.EVENT_AMOUNT_IN_TERM) AS EVENT_AMOUNT
-    
-    /* 使いまわされそうな式をサブクエリで先に計算しておく。Userはこのサブクエリの結果に&をつけてアクセス出来るようにする */
-    FROM (SELECT 
+    sum(t1.EVENT_BIT_IN_TERM) AS EVENT_COUNT,
+    sum(IFN(t1.EVENT_BIT_IN_TERM=1, &EVENT_AMOUNT, 0)) AS EVENT_AMOUNT
+    /*
+    下記の使いまわされそうな式をサブクエリで先に計算しておく。
+    Userは&properties, &computedの中でこのサブクエリの結果にアクセス出来る。
+      input fieldのすべてのフィールド
+      BAFLAG
+      CY
+      CM
+      ANNIV_DT
+      TERM_START
+      TERM_END
+      PM
+      INNER_PM
+      PY
+      EVENT_BIT_IN_TERM,
+      EVENT_AMOUNT_IN_TERM,
+      EXPS_DUR,
+      EXTENDED_DUR,
+      PY_START_DT,
+      PY_END_DT,
+      FULLY_OBSERVED_PY
+
+    Userはこのサブクエリ内で計算される列の挙動を下記のマクロ変数によりコントロール出来る。
+      &POL_START_DT    : PY, PM計算の際の始点になる。
+      &EXPS_START_DT   :
+      &EXPS_END_DT     :
+      &EXTENDED_END_DT : 観測対象のイベントが発生しているデータの観測期間単位の後ろまで伸ばした日。t1.EXTENDED_DUR, t1.EXTENDED_DUR_AMOUNTの計算に使用される。
+      &EVENT_DT        :
+      &EVENT_AMOUNT    :
+      &EXPS_AMOUNT     :
+      &OBS_START_DT    : t1.fully_observed_pyの計算に使用される
+      &OBS_END_DT      : t1.fully_observed_pyの計算に使用される
+      &EX_FROM_COUNT   : 減額レコードのようにexposureとしてamountは計上したいが、countは計上したくないものには1をたてる。
+    */
+    FROM (SELECT
             *,
             "&baflag" AS BAFLAG,
             &c_year AS CY,
@@ -49,9 +83,7 @@
               (year(Calculated TERM_START) - year(&POL_START_DT)) + ifn((Calculated BAFLAG)='AA',1,0) as PY,
             ;
             /* */
-
-            IFN((Calculated TERM_START) <= &g_EVENT_DT <= (Calculated TERM_END), IFN(&EVENT_AMOUNT>0, 1, 0), 0) AS EVENT_BIT,
-            IFN((Calculated TERM_START) <= &g_EVENT_DT <= (Calculated TERM_END), MAX(0, &EVENT_AMOUNT), 0) AS EVENT_AMOUNT_IN_TERM,
+            IFN((Calculated TERM_START) <= &g_EVENT_DT <= (Calculated TERM_END), IFN(&EVENT_AMOUNT>0, 1, 0), 0) AS EVENT_BIT_IN_TERM,
             max(0, min(&g_EXPS_END_DT, (Calculated TERM_END)) - max(&g_EXPS_START_DT, (Calculated TERM_START)) + 1)/365.25 AS EXPS_DUR,
             max(0, min(&g_EXTENDED_END_DT, (Calculated TERM_END)) - max(&g_EXPS_START_DT, (Calculated TERM_START)) + 1)/365.25 AS EXTENDED_DUR,
             INTNX("YEAR", &POL_START_DT, (Calculated PY)-1, "sameday") AS PY_START_DT,
@@ -69,25 +101,11 @@
           )
     as t1
 
-    where (EXPS_DUR>0 and &EXPS_AMOUNT<>0) or (EVENT_AMOUNT_IN_TERM > 0) or (EXTENDED_DUR>0 and &EXPS_AMOUNT<>0)
+    where (EXPS_DUR>0 and &EXPS_AMOUNT<>0) or (EVENT_BIT_IN_TERM > 0) or (EXTENDED_DUR>0 and &EXPS_AMOUNT<>0)
     GROUP BY  &properties
               %if not %sysevalf(%superq(computed_fields_used_by_grouping)=,boolean) %then , ; &computed_fields_used_by_grouping
 %mend Calc_Exposure;
 
-/* userからマクロ変数で呼び出せるようにailiasを貼る。 */
-%let BAFLAG = t1.BAFLAG;
-%let ANNIV_DT = t1.ANNIV_DT;
-%let TERM_START = t1.TERM_START;
-%let TERM_END = t1.TERM_END;
-%let EXPS_DUR = t1.EXPS_DUR;
-%let CY = t1.CY;
-%let CM = t1.CM;
-%let PM = t1.PM;
-%let INNER_PM = t1.INNER_PM;
-%let PY = t1.PY;
-%let PY_START_DT = t1.PY_START_DT;
-%let PY_END_DT = t1.PY_END_DT;
-%let FULLY_OBSERVED_PY = t1.FULLY_OBSERVED_PY;
 
 %macro monthly_loop(start_month, stop_month);
   %local yyyymm;
@@ -101,9 +119,10 @@
     %Calc_Exposure(c_year=&year, c_month=&month, baflag=AA);
 
     /* Special case when we reach end of a year*/
-    %if &month = 12 %then %let yyyymm = %eval(&yyyymm + 88);     
+    %if &month = 12 %then %let yyyymm = %eval(&yyyymm + 88);
   %end;
 %mend monthly_loop;
+
 
 %macro yearly_loop(start_year, stop_year);
   %do year=&start_year %to &stop_year;
@@ -114,7 +133,8 @@
   %end;
 %mend yearly_loop;
 
-/* main part*/
+
+/* main part: userはこのマクロ関数を呼び出す */
 %macro make_exposure_table(start_month, stop_month, output, span=monthly);
   %_eg_conditional_dropds(&output,tmp);
 
@@ -125,7 +145,7 @@
 
   %global g_EXPS_START_DT;
   %let g_EXPS_START_DT = ifn(
-                              &EXPS_START_DT is missing,  
+                              &EXPS_START_DT is missing,
                               0, /* 欠損値の場合にexps_dur, exps_dur_amountを0にするため。exps_durの計算式内にてmin, maxが使用されているがこれらが欠損値を無視するためこの対応をしておく。*/
                               max(&EXPS_START_DT, &start_dt)  /* span = yeary を指定した場合は余計な期間が入らないように端をカットしておく */
                             );
