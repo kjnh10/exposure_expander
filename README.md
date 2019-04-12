@@ -10,16 +10,16 @@ make exposure-time series table from the latest snapshot
 
 /* user parameter setting */
 /* You can access to the calculated fields below which vary depending on specific terms. */
-  * &CM
-  * &CY  /* filled FY when specified span=FY_yearly */
-  * &TERM_START
-  * &TERM_END
-  * &BAFLAG
-  * &ANIV_DT
-  * &EXPS_DUR
-  * &PM
-  * &PY
-  * &FULLY_OBSERVED_PY
+  * CM
+  * CY  /* filled FY when specified span=FY_yearly */
+  * TERM_START
+  * TERM_END
+  * BAFLAG
+  * ANIV_DT
+  * EXPS_DUR
+  * PM
+  * PY
+  * FULLY_OBSERVED_PY
 
 %let input = WORK.QUERY_FOR_TIME_SERIES_SAS7B_0001;
 %let input = WORK.dev;
@@ -38,10 +38,8 @@ make exposure-time series table from the latest snapshot
 %let computed = IFN(0 < t1.FIRST_RENEW_DT <= t1.TERM_START and t1.YRT = 0, 1, 0) AS AFTER_RENEWAL;
 %let computed_fields_used_by_grouping = AFTER_RENEWAL;
 %let properties = /* t1.POLICY_ID, t1.COV_NO, */
-                  &CY, &CM, t1.BAFLAG, t1.IM, t1.'UW-typ-CD'n,
-                  t1.SEX_CODE, t1.PLAN_CODE, t1.'Main Product'n, t1.ISSUE_AGE, t1.CHANNEL_CODE, t1.PREM_PMT_PERIOD, t1.PLAN_TERM, t1.ORIG_TERM, t1.COV_TERM
-                  ,t1.MULT_RATING_FCT
-                  ;
+                  CY, CM, BAFLAG, FULLY_OBSERVED_PY,
+                  t1.IM, t1.'UW-typ-CD'n, t1.SEX_CODE, t1.PLAN_CODE, t1.'Main Product'n, t1.ISSUE_AGE, t1.CHANNEL_CODE, t1.PREM_PMT_PERIOD, t1.PLAN_TERM, t1.ORIG_TERM, t1.COV_TERM,t1.MULT_RATING_FCT;
 
 /* main part*/
   %make_exposure_table(start_month = 201001, stop_month = 201709, output=WORK.EXP_MONTHLY)

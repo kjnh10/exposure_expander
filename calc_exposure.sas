@@ -1,26 +1,26 @@
 %macro Calc_Exposure(c_year, c_month, baflag);
-   /* c_year, c_month, baflag�ɑ΂���Exposure���v�Z����summary���s���֐� */
+   /* c_year, c_month, baflagに対してExposureを計算してsummaryを行う関数 */
 
    SELECT
-    /* ���͑��� */
+    /* 分析属性 */
     &properties,
 
-    /* custom field: ���͑����̒ǉ��ɂ��W�v�l�̒ǉ��ɂ����p�ł��� */
+    /* custom field: 分析属性の追加にも集計値の追加にも利用できる */
     &computed %if not %sysevalf(%superq(computed)=,boolean) %then , ;
 
-    /* �W�v�l */
+    /* 集計値 */
     sum(IFN(&EX_FROM_COUNT, 0, t1.EXPS_DUR)) AS EXPS_DUR,
     sum(&EXPS_AMOUNT * t1.EXPS_DUR) AS EXPS_DUR_AMOUNT,
-    sum(IFN(&EX_FROM_COUNT, 0, IFN(t1.EXPS_DUR>0, 1, 0))) AS EXPS_COUNT,  /* ������if��extended���ꂽ�����ł�count�����̂�����邽�߁B */
+    sum(IFN(&EX_FROM_COUNT, 0, IFN(t1.EXPS_DUR>0, 1, 0))) AS EXPS_COUNT,  /* 内部のifはextendedされた部分ではcountが立つのを避けるため。 */
     sum(IFN(t1.EXPS_DUR>0, &EXPS_AMOUNT, 0)) AS EXPS_AMOUNT,
     sum(IFN(&EX_FROM_COUNT, 0, t1.EXTENDED_DUR)) AS EXTENDED_DUR,
     sum(&EXPS_AMOUNT * t1.EXTENDED_DUR) AS EXTENDED_DUR_AMOUNT,
     sum(t1.EVENT_BIT_IN_TERM) AS EVENT_COUNT,
     sum(IFN(t1.EVENT_BIT_IN_TERM=1, &EVENT_AMOUNT, 0)) AS EVENT_AMOUNT
     /*
-    ���L�̎g���܂킳�ꂻ���Ȏ����T�u�N�G���Ő�Ɍv�Z���Ă����B
-    User��&properties, &computed�̒��ł��̃T�u�N�G���̌��ʂɃA�N�Z�X�o����B
-      input field�̂��ׂẴt�B�[���h
+    下記の使いまわされそうな式をサブクエリで先に計算しておく。
+    Userは&properties, &computedの中でこのサブクエリの結果にアクセス出来る。
+      input fieldのすべてのフィールド
       BAFLAG
       CY
       CM
@@ -38,17 +38,17 @@
       PY_END_DT,
       FULLY_OBSERVED_PY
 
-    User�͂��̃T�u�N�G�����Ōv�Z������̋��������L�̃}�N���ϐ��ɂ��R���g���[���o����B
-      &POL_START_DT    : PY, PM�v�Z�̍ۂ̎n�_�ɂȂ�B
+    Userはこのサブクエリ内で計算される列の挙動を下記のマクロ変数によりコントロール出来る。
+      &POL_START_DT    : PY, PM計算の際の始点になる。
       &EXPS_START_DT   :
       &EXPS_END_DT     :
-      &EXTENDED_END_DT : �ϑ��Ώۂ̃C�x���g���������Ă���f�[�^�̊ϑ����ԒP�ʂ̌��܂ŐL�΂������Bt1.EXTENDED_DUR, t1.EXTENDED_DUR_AMOUNT�̌v�Z�Ɏg�p�����B
+      &EXTENDED_END_DT : 観測対象のイベントが発生しているデータの観測期間単位の後ろまで伸ばした日。t1.EXTENDED_DUR, t1.EXTENDED_DUR_AMOUNTの計算に使用される。
       &EVENT_DT        :
       &EVENT_AMOUNT    :
       &EXPS_AMOUNT     :
-      &OBS_START_DT    : t1.fully_observed_py�̌v�Z�Ɏg�p�����
-      &OBS_END_DT      : t1.fully_observed_py�̌v�Z�Ɏg�p�����
-      &EX_FROM_COUNT   : ���z���R�[�h�̂悤��exposure�Ƃ���amount�͌v�サ�������Acount�͌v�サ�����Ȃ����̂ɂ�1�����Ă�B
+      &OBS_START_DT    : t1.fully_observed_pyの計算に使用される
+      &OBS_END_DT      : t1.fully_observed_pyの計算に使用される
+      &EX_FROM_COUNT   : 減額レコードのようにexposureとしてamountは計上したいが、countは計上したくないものには1をたてる。
     */
     FROM (SELECT
             *,
@@ -56,7 +56,7 @@
             &c_year AS CY,
             &c_month AS CM,
 
-            /* monthly��yearly���ɂ�胍�W�b�N���ς�镔�� */
+            /* monthlyかyearlyかによりロジックが変わる部分 */
             %if &g_span=monthly %then
               COALESCE(MDY(&c_month, DAY(&POL_START_DT), &c_year), INTNX("MONTH", MDY(&c_month, 1, &c_year), 1)-1) AS ANNIV_DT,
               IFN("&baflag" = "BA", MDY(&c_month, 1, &c_year), (Calculated ANNIV_DT)) AS TERM_START,
@@ -134,7 +134,7 @@
 %mend yearly_loop;
 
 
-/* main part: user�͂��̃}�N���֐����Ăяo�� */
+/* main part: userはこのマクロ関数を呼び出す */
 %macro make_exposure_table(start_month, stop_month, output, span=monthly);
   %_eg_conditional_dropds(&output,tmp);
 
@@ -146,8 +146,8 @@
   %global g_EXPS_START_DT;
   %let g_EXPS_START_DT = ifn(
                               &EXPS_START_DT is missing,
-                              0, /* �����l�̏ꍇ��exps_dur, exps_dur_amount��0�ɂ��邽�߁Bexps_dur�̌v�Z�����ɂ�min, max���g�p����Ă��邪����炪�����l�𖳎����邽�߂��̑Ή������Ă����B*/
-                              max(&EXPS_START_DT, &start_dt)  /* span = yeary ���w�肵���ꍇ�͗]�v�Ȋ��Ԃ�����Ȃ��悤�ɒ[���J�b�g���Ă��� */
+                              0, /* 欠損値の場合にexps_dur, exps_dur_amountを0にするため。exps_durの計算式内にてmin, maxが使用されているがこれらが欠損値を無視するためこの対応をしておく。*/
+                              max(&EXPS_START_DT, &start_dt)  /* span = yeary を指定した場合は余計な期間が入らないように端をカットしておく */
                             );
 
   %global g_EXPS_END_DT;
@@ -171,7 +171,7 @@
     %if &g_span=monthly %then
       create table tmp as %Calc_Exposure(c_year=2010, c_month=12, baflag=BA);
     %else
-      create table tmp as %Calc_Exposure(c_year=2010, c_month=-1, baflag=BA);  /* yearly��monthly�Ō��݂͓���̃e�[�u�������������͂������O�̂��ߕ����Ă����B*/
+      create table tmp as %Calc_Exposure(c_year=2010, c_month=-1, baflag=BA);  /* yearlyとmonthlyで現在は同一のテーブルが生成されるはずだが念のため分けておく。*/
     ;
     create table &output like tmp;
     drop table tmp;
