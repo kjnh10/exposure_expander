@@ -1,56 +1,32 @@
 # This is python wrapper for calc_exposure.sas
 
-"""
-# import saspy included in this module
-import concurrent.futures as confu
-From calc_exposure import CalcExposure
-
-def process(sas_code):
-    ce = CalcExposure(sas_code)
-    ce.calc()
-
-with confu.ProcessPoolExecutor() as executor:
-    # futures = [executor.submit(process, yyyy, f'sas_code_dummy_{yyyy}') for yyyy in range(2010, 2020)]
-    futures = []
-    for yyyy in range(2010, 2020):
-        sas_code = f"""
-            {yyyy}
-        """
-        futures.append(executor.submit(process, yyyy, f'sas_code'))
-
-    for future in confu.as_completed(futures):
-        print(future.result())
-"""
-
 import saspy
+import concurrent.futures as confu
 
-class CalcExposure(object):
-    material_path = ''
-    output_path = ''
-    def __init__(self, name, sas_code):
-        self.name = name
-        self.sas = saspy.SASsession(cgfname='winiomlinux', omruser='watkoji', omrpw='s4rhfkxm/')
-        self.sas_code = sas_code
-        with open(f'./sample{name}', mode='a') as f:
-            f.write('hello')
-    
+
+class SasConcurrent(object):
+    def __init__(self, sas_codes, sas_omruser, sas_omrpw):
+        self.sas_codes = sas_codes
+        self.sas_omruser = sas_omruser
+        self.sas_omrpw = sas_omrpw
+
+
     def calc(self):
-        self.sas.submit(self.sas_code)
+        with confu.ProcessPoolExecutor() as executor:
+            futures = []
+            for sas_code in self.sas_codes:
+                futures.append(executor.submit(process, sas_code, self.sas_omruser, self.sas_omrpw))
 
-def process(name, sas_code):
-    ce = CalcExposure(name, sas_code)
-    ce.calc()
+            for future in confu.as_completed(futures):
+                print(future.result())
 
-if __name__=='__main__':
-    import concurrent.futures as confu
-    with open(f'./start', mode='a') as f:
-        f.write('hello')  # check starting
 
-    with confu.ProcessPoolExecutor() as executor:
-        # futures = [executor.submit(process, yyyy, f'sas_code_dummy_{yyyy}') for yyyy in range(2010, 2020)]
-        futures = []
-        for yyyy in range(2010, 2020):
-            futures.append(executor.submit(process, yyyy, f'sas_code_dummy_{yyyy}'))
-
-        for future in confu.as_completed(futures):
-            print(future.result())
+def process(sas_code, omruser, omrpw):
+    try:
+        sas_session = saspy.SASsession(cgfname='winiomlinux', omruser=omruser, omrpw=omrpw)
+    except Exception as e:
+        print(e)
+        raise Exception("connecting to sas server failed")
+    # sas_session._io.sascfg.encoding='utf8'
+    result = sas_session.submit(sas_code)
+    return result['LOG']
